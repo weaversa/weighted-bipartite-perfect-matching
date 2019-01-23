@@ -11,10 +11,12 @@ int main() {
   for (i = 0; i < m; i++) {
     edges[i].left = rand() % n;
     edges[i].right = rand() % n;
-    edges[i].cost = rand() % 100;
+    edges[i].cost = (rand() % 100) + 1;
   }
   
   uint32_t *matching = hungarianMinimumWeightPerfectMatching(n, edges, m);
+
+  free(edges);
   
   if (matching == NULL) {
     fprintf(stdout, "Failure: Hungarian algorithm didn't find a matching.\n");
@@ -22,6 +24,8 @@ int main() {
     fprintf(stdout, "Matching was found.\n");
   }
 
+  free(matching);
+  
   return 0;
 }
 
