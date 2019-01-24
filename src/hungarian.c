@@ -49,9 +49,18 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
     WeightedBipartiteEdge edge = allEdges[edgeIndex];
     if (edge.left >= 0 && edge.left < n) {
       leftEdgeCounts[edge.left]++;
+    } else {
+      free(leftEdgeCounts);
+      free(rightEdgeCounts);
+      return NULL;
     }
+    
     if (edge.right >= 0 && edge.right < n) {
       rightEdgeCounts[edge.right]++;
+    } else {
+      free(leftEdgeCounts);
+      free(rightEdgeCounts);
+      return NULL;
     }
   }
 
