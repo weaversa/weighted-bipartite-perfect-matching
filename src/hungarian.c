@@ -12,12 +12,12 @@
 //
 // (Note: end value is cached, so fo(i, function()) will only have function called once.)
 
-static const uint32_t oo = ~0;
-static const uint32_t UNMATCHED = ~0;
+static const int32_t oo = 0x7fffffff;
+static const uint32_t UNMATCHED = 0xffffffff;
 
 typedef struct LeftEdge {
   uint32_t right;
-  uint32_t cost;
+  int32_t cost;
 } LeftEdge;
 
 int LeftEdgeCmp (const void *a, const void *b) {
@@ -89,7 +89,7 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
 
     qsort(edges, leftEdgeCounts[i], sizeof(LeftEdge), LeftEdgeCmp);
     
-    int edgeCount = 0;
+    uint32_t edgeCount = 0;
     for(edgeIndex = 1; edgeIndex < leftEdgeCounts[i]; edgeIndex++) {
       LeftEdge edge = edges[edgeIndex];
       if (edge.right != edges[edgeCount].right) {
@@ -106,8 +106,8 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
   // right, which reduce the costs of attached edges.  We maintain
   // that every reduced cost, cost[i][j] - leftPotential[i] -
   // leftPotential[j], is greater than zero.
-  uint32_t *leftPotential = malloc(n * sizeof(uint32_t));
-  uint32_t *rightPotential = malloc(n * sizeof(uint32_t));
+  int32_t *leftPotential = malloc(n * sizeof(int32_t));
+  int32_t *rightPotential = malloc(n * sizeof(int32_t));
   
   //region Node potential initialization
   
@@ -119,7 +119,7 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
   
   for(i = 0; i < n; i++) {
     LeftEdge *edges = leftEdges[i];
-    uint32_t smallestEdgeCost = edges[0].cost;
+    int32_t smallestEdgeCost = edges[0].cost;
     for(edgeIndex = 1; edgeIndex < leftEdgeCounts[i]; edgeIndex++) {
       if (edges[edgeIndex].cost < smallestEdgeCost) {
 	smallestEdgeCost = edges[edgeIndex].cost;
@@ -128,7 +128,7 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
     
     // Set node potential to the smallest incident edge cost.
     // This is as high as we can take it without creating an edge with zero reduced cost.
-    leftPotential[i] = smallestEdgeCost;
+    leftPotential[i] = (int32_t) smallestEdgeCost;
   }
   
   // Second, we raise the potentials on the right as high as we can for each node.
@@ -136,19 +136,22 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
   // by the left potentials.
   // This guarantees that each node on the right has at least one "tight" edge.
 
-  memset(rightPotential, 0xff, n * sizeof(uint32_t));
-
+  for(i = 0; i < n; i++) {
+    rightPotential[i] = oo;
+  }
+  
   for(i = 0; i < n; i++) {
     LeftEdge *edges = leftEdges[i];
     for(edgeIndex = 0; edgeIndex < leftEdgeCounts[i]; edgeIndex++) {
       LeftEdge edge = edges[edgeIndex];
-      uint32_t reducedCost = edge.cost - leftPotential[i];
-      assert(reducedCost <= edge.cost);
+      int32_t reducedCost = edge.cost - leftPotential[i];
+      assert(reducedCost >= 0);
       if (rightPotential[edge.right] > reducedCost) {
 	rightPotential[edge.right] = reducedCost;
       }
     }
   }
+
 
   //endregion Node potential initialization
 
@@ -167,8 +170,8 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
     uint32_t tightEdgeCount = 0;
     for(edgeIndex = 0; edgeIndex < leftEdgeCounts[i]; edgeIndex++) {
       LeftEdge edge = edges[edgeIndex];
-      uint32_t reducedCost = edge.cost - leftPotential[i] - rightPotential[edge.right];
-      assert(reducedCost <= edge.cost);
+      int32_t reducedCost = edge.cost - leftPotential[i] - rightPotential[edge.right];
+      assert(reducedCost >= 0);
       if (reducedCost == 0) {
 	if (edgeIndex != tightEdgeCount) {
 	  //Swap edges
@@ -221,16 +224,13 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
 
     free(leftPotential);
     free(rightPotential);
+    free(leftTightEdgesCount);
     
     free(rightMatchedTo);
-      
+    
     return leftMatchedTo;
   }
 
-  return NULL;
-  
-  /*
-  
   //endregion Initial matching (speedup?)
   
   // While an augmenting path exists, we add it to the matching.
@@ -251,84 +251,91 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
   //
   // rightMinimumSlackLeftNode[j] gives the node i with the corresponding edge.
   // rightMinimumSlackEdgeIndex[j] gives the edge index for node i.
-  
-  int rightMinimumSlack[n], rightMinimumSlackLeftNode[n], rightMinimumSlackEdgeIndex[n];
-  
-  std::deque<int> leftNodeQueue;
-  bool leftSeen[n];
-  int rightBacktrack[n];
+
+  int32_t *rightMinimumSlack = malloc(n * sizeof(int32_t));
+  uint32_t *rightMinimumSlackLeftNode = malloc(n * sizeof(uint32_t));
+  uint32_t *rightMinimumSlackEdgeIndex = malloc(n * sizeof(uint32_t));
+
+  uint32_t_queue *leftNodeQueue = uint32_t_queue_alloc(0);
+
+  uint8_t *leftSeen = malloc(n * sizeof(uint8_t));
+  uint32_t *rightBacktrack = malloc(n * sizeof(uint32_t));
   
   // Note: the above are all initialized at the start of the loop.
   
   //endregion Inner loop state variables
   
   while (currentMatchingCardinality < n) {
-    
+
     //region Loop state initialization
     
     // Clear out slack caches.
     // Note: We need to clear the nodes so that we can notice when there aren't any edges available.
-    std::fill_n(rightMinimumSlack, n, oo);
-    std::fill_n(rightMinimumSlackLeftNode, n, UNMATCHED);
+    for(i = 0; i < n; i++) {
+      rightMinimumSlack[i] = oo;
+    }
+    memset(rightMinimumSlackLeftNode, 0xff, n * sizeof(uint32_t));
     
     // Clear the queue.
-    leftNodeQueue.clear();
+    uint32_t_queue_clear(leftNodeQueue);
     
     // Mark everything "unseen".
-    std::fill_n(leftSeen, n, false);
-    std::fill_n(rightBacktrack, n, UNMATCHED);
-    
+    memset(leftSeen, 0x00, n * sizeof(uint8_t));
+    memset(rightBacktrack, 0xff, n * sizeof(uint32_t));
+
     //endregion Loop state initialization
     
-    int startingLeftNode = UNMATCHED;
+    uint32_t startingLeftNode = UNMATCHED;
     
     //region Find unmatched starting node
     
     // Find an unmatched left node to search outward from.
     // By heuristic, we pick the node with fewest tight edges, giving the BFS an easier time.
     // (The asymptotics don't care about this, but maybe it helps. Eh.)
-    {
-      int minimumTightEdges = oo;
-      fo(i, n) {
-	if (leftMatchedTo[i] == UNMATCHED && leftTightEdgesCount[i] < minimumTightEdges) {
-	  minimumTightEdges = leftTightEdgesCount[i];
-	  startingLeftNode = i;
-	}
+    uint32_t minimumTightEdges = 0xfffffff;
+    for(i = 0; i < n; i++) {
+      if (leftMatchedTo[i] == UNMATCHED && leftTightEdgesCount[i] < minimumTightEdges) {
+	minimumTightEdges = leftTightEdgesCount[i];
+	startingLeftNode = i;
       }
     }
-    
+
     //endregion Find unmatched starting node
     
     assert(startingLeftNode != UNMATCHED);
     
-    assert(leftNodeQueue.empty());
-    leftNodeQueue.push_back(startingLeftNode);
-    leftSeen[startingLeftNode] = true;
+    assert(uint32_t_queue_empty(leftNodeQueue));
+
+    uint32_t_queue_enqueue(leftNodeQueue, startingLeftNode);
+    leftSeen[startingLeftNode] = 1;
     
-    int endingRightNode = UNMATCHED;
+    uint32_t endingRightNode = UNMATCHED;
     while (endingRightNode == UNMATCHED) {
       
       //region BFS until match found or no edges to follow
       
-      while (endingRightNode == UNMATCHED && !leftNodeQueue.empty()) {
+      while (endingRightNode == UNMATCHED && !uint32_t_queue_empty(leftNodeQueue)) {
 	// Implementation note: this could just as easily be a DFS, but a BFS probably
 	// has less edge flipping (by my guess), so we're using a BFS.
 	
-	const int i = leftNodeQueue.front();
-	leftNodeQueue.pop_front();
-	
-	std::vector<LeftEdge>& edges = leftEdges[i];
-	// Note: Some of the edges might not be tight anymore, hence the awful loop.
-	for(int edgeIndex = 0; edgeIndex < leftTightEdgesCount[i]; ++edgeIndex) {
-	  const LeftEdge& edge = edges[edgeIndex];
-	  const int j = edge.right;
-	  
+	i = uint32_t_queue_dequeue(leftNodeQueue);
+
+        // Note: Some of the edges might not be tight anymore.
+	LeftEdge *edges = leftEdges[i];
+	for(edgeIndex = 0; edgeIndex < leftTightEdgesCount[i]; edgeIndex++) {
+	  LeftEdge edge = edges[edgeIndex];
+	  uint32_t j = edge.right;
+
 	  assert(edge.cost - leftPotential[i] - rightPotential[j] >= 0);
 	  if (edge.cost > leftPotential[i] + rightPotential[j]) {
 	    // This edge is loose now.
-	    --leftTightEdgesCount[i];
-	    std::swap(edges[edgeIndex], edges[leftTightEdgesCount[i]]);
-	    --edgeIndex;
+            assert(leftTightEdgesCount[i] >= 0);
+	    leftTightEdgesCount[i]--;
+	    //Swap edges
+	    LeftEdge tmp = edges[leftTightEdgesCount[i]];
+	    edges[leftTightEdgesCount[i]] = edges[edgeIndex];
+	    edges[edgeIndex] = tmp;
+	    edgeIndex--;
 	    continue;
 	  }
 	  
@@ -337,33 +344,33 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
 	  }
 	  
 	  rightBacktrack[j] = i;
-	  int matchedTo = rightMatchedTo[j];
+	  uint32_t matchedTo = rightMatchedTo[j];
 	  if (matchedTo == UNMATCHED) {
 	    // Match found. This will terminate the loop.
 	    endingRightNode = j;
 	    
 	  } else if (!leftSeen[matchedTo]) {
 	    // No match found, but a new left node is reachable. Track how we got here and extend BFS queue.
-	    leftSeen[matchedTo] = true;
-	    leftNodeQueue.push_back(matchedTo);
+	    leftSeen[matchedTo] = 1;
+	    uint32_t_queue_enqueue(leftNodeQueue, matchedTo);
 	  }
 	}
-	
+
 	//region Update cached slack values
 	
 	// The remaining edges may be to nodes that are unreachable.
 	// We accordingly update the minimum slackness for nodes on the right.
-	
-	if (endingRightNode == UNMATCHED) {
-	  const int potential = leftPotential[i];
-	  range(edgeIndex, leftTightEdgesCount[i], edges.size()) {
-	    const LeftEdge& edge = edges[edgeIndex];
-	    int j = edge.right;
-	    
+
+        if (endingRightNode == UNMATCHED) {
+	  int32_t potential = leftPotential[i];
+	  for(edgeIndex = leftTightEdgesCount[i]; edgeIndex < leftEdgeCounts[i]; edgeIndex++) {
+	    LeftEdge edge = edges[edgeIndex];
+	    uint32_t j = edge.right;
+
 	    if (rightMatchedTo[j] == UNMATCHED || !leftSeen[rightMatchedTo[j]]) {
 	      // This edge is to a node on the right that we haven't reached yet.
 	      
-	      int reducedCost = edge.cost - potential - rightPotential[j];
+	      int32_t reducedCost = edge.cost - potential - rightPotential[j];
 	      assert(reducedCost >= 0);
 	      
 	      if (reducedCost < rightMinimumSlack[j]) {
@@ -379,19 +386,20 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
 	
 	//endregion Update cached slack values
       }
-      
+
       //endregion BFS until match found or no edges to follow
       
       //region Update node potentials to add edges, if no match found
       
       if (endingRightNode == UNMATCHED) {
 	// Out of nodes. Time to update some potentials.
-	int minimumSlackRightNode = UNMATCHED;
+	uint32_t minimumSlackRightNode = UNMATCHED;
 	
 	//region Find minimum slack node, or abort if none exists
 	
-	int minimumSlack = oo;
-	fo(j, n) {
+	int32_t minimumSlack = oo;
+	uint32_t j;
+	for(j = 0; j < n; j++) {
 	  if (rightMatchedTo[j] == UNMATCHED || !leftSeen[rightMatchedTo[j]]) {
 	    // This isn't a node reached by our BFS. Update minimum slack.
 	    if (rightMinimumSlack[j] < minimumSlack) {
@@ -405,16 +413,42 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
 	  // The caches are all empty. There was no option available.
 	  // This means that the node the BFS started at, which is an unmatched left node, cannot reach the
 	  // right - i.e. it will be impossible to find a perfect matching.
+
+	  //SEAN!!! Free so much stuff!
+
+	  free(leftEdgeCounts);
 	  
-	  return std::vector<int>();
+	  for(i = 0; i < n; i++) {
+	    free(leftEdges[i]);
+	  }
+	  free(leftEdges);
+	  
+	  free(leftPotential);
+	  free(rightPotential);
+          free(leftTightEdgesCount);
+          
+	  free(rightMatchedTo);
+	  free(leftMatchedTo);
+	  
+	  free(rightMinimumSlack);
+	  free(rightMinimumSlackLeftNode);
+	  free(rightMinimumSlackEdgeIndex);
+
+	  uint32_t_queue_free(leftNodeQueue, NULL);
+	  free(leftNodeQueue);
+
+	  free(leftSeen);
+	  free(rightBacktrack);
+	  
+	  return NULL;
 	}
-	
-	//endregion Find minimum slack node, or abort if none exists
+
+       	//endregion Find minimum slack node, or abort if none exists
 	
 	assert(minimumSlackRightNode != UNMATCHED);
 	
 	// Adjust potentials on left and right.
-	fo(i, n) {
+	for(i = 0; i < n; i++) {
 	  if (leftSeen[i]) {
 	    leftPotential[i] += minimumSlack;
 	    if (leftMatchedTo[i] != UNMATCHED) {
@@ -422,25 +456,28 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
 	    }
 	  }
 	}
-	
+
 	// Downward-adjust slackness caches.
-	fo(j, n) {
+	for(j = 0; j < n; j++) {
 	  if (rightMatchedTo[j] == UNMATCHED || !leftSeen[rightMatchedTo[j]]) {
 	    rightMinimumSlack[j] -= minimumSlack;
 	    
 	    // If the slack hit zero, then we just found ourselves a new tight edge.
 	    if (rightMinimumSlack[j] == 0) {
-	      const int i = rightMinimumSlackLeftNode[j];
-	      const int edgeIndex = rightMinimumSlackEdgeIndex[j];
+	      uint32_t i = rightMinimumSlackLeftNode[j];
+	      uint32_t edgeIndex = rightMinimumSlackEdgeIndex[j];
 	      
 	      //region Update leftEdges[i] and leftTightEdgesCount[i]
 	      
 	      // Move it in the relevant edge list.
 	      if (edgeIndex != leftTightEdgesCount[i]) {
-		std::vector<LeftEdge>& edges = leftEdges[i];
-		std::swap(edges[edgeIndex], edges[leftTightEdgesCount[i]]);
+		LeftEdge *edges = leftEdges[i];
+		//Swap edges
+		LeftEdge tmp = edges[leftTightEdgesCount[i]];
+		edges[leftTightEdgesCount[i]] = edges[edgeIndex];
+		edges[edgeIndex] = tmp;
 	      }
-	      ++leftTightEdgesCount[i];
+	      leftTightEdgesCount[i]++;
 	      
 	      //endregion Update leftEdges[i] and leftTightEdgesCount[i]
 	      
@@ -450,14 +487,14 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
 	      if (endingRightNode == UNMATCHED) {
 		// We're contemplating the consequences of following (i, j), as we do in the BFS above.
 		rightBacktrack[j] = i;
-		int matchedTo = rightMatchedTo[j];
+		uint32_t matchedTo = rightMatchedTo[j];
 		if (matchedTo == UNMATCHED) {
 		  // Match found!
 		  endingRightNode = j;
 		} else if (!leftSeen[matchedTo]) {
 		  // No match, but new left node found. Extend BFS queue.
-		  leftSeen[matchedTo] = true;
-		  leftNodeQueue.push_back(matchedTo);
+		  leftSeen[matchedTo] = 1;
+		  uint32_t_queue_enqueue(leftNodeQueue, matchedTo);
 		}
 	      }
 	    }
@@ -471,27 +508,49 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
     // At this point, we've found an augmenting path between startingLeftNode and endingRightNode.
     // We'll just use the backtracking info to update our match information.
     
-    ++currentMatchingCardinality;
+    currentMatchingCardinality++;
     
     //region Backtrack and flip augmenting path
     
-    {
-      int currentRightNode = endingRightNode;
-      while (currentRightNode != UNMATCHED) {
-	const int currentLeftNode = rightBacktrack[currentRightNode];
-	const int nextRightNode = leftMatchedTo[currentLeftNode];
-	
-	rightMatchedTo[currentRightNode] = currentLeftNode;
-	leftMatchedTo[currentLeftNode] = currentRightNode;
-	
-	currentRightNode = nextRightNode;
-      }
+    uint32_t currentRightNode = endingRightNode;
+    while (currentRightNode != UNMATCHED) {
+      uint32_t currentLeftNode = rightBacktrack[currentRightNode];
+      uint32_t nextRightNode = leftMatchedTo[currentLeftNode];
+      
+      rightMatchedTo[currentRightNode] = currentLeftNode;
+      leftMatchedTo[currentLeftNode] = currentRightNode;
+      
+      currentRightNode = nextRightNode;
     }
-    
-    //endregion Backtrack and flip augmenting path
   }
+    
+  //endregion Backtrack and flip augmenting path
+
+  free(leftEdgeCounts);
   
+  for(i = 0; i < n; i++) {
+    free(leftEdges[i]);
+  }
+  free(leftEdges);
+  
+  free(leftPotential);
+  free(rightPotential);
+  free(leftTightEdgesCount);
+  
+  free(rightMatchedTo);
+  
+  free(rightMinimumSlack);
+  free(rightMinimumSlackLeftNode);
+  free(rightMinimumSlackEdgeIndex);
+  
+  uint32_t_queue_free(leftNodeQueue, NULL);
+  free(leftNodeQueue);
+  
+  free(leftSeen);
+  free(rightBacktrack);
+    
   // Oh look, we're done.
-  return std::vector<int>(leftMatchedTo, leftMatchedTo + n);
-  */
+  return leftMatchedTo;
 }
+
+create_c_queue_type(uint32_t_queue, uint32_t)

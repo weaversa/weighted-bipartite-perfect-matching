@@ -7,10 +7,14 @@
 #include <string.h>
 #include <assert.h>
 
+#include "c_queue_types.h"
+
+create_c_queue_headers(uint32_t_queue, uint32_t)
+
 typedef struct WeightedBipartiteEdge {
   uint32_t left;
   uint32_t right;
-  uint32_t cost;
+  int32_t cost;
 } WeightedBipartiteEdge;
 
 // Given the number of nodes on each side of the bipartite graph and a list of edges, returns a minimum-weight perfect matching.

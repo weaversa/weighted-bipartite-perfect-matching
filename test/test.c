@@ -1,20 +1,36 @@
 #include "hungarian.h"
 
-int main() {
-  
-  uint32_t n = 100;
-  uint32_t m = 1000;
-  uint32_t i;
-  
-  WeightedBipartiteEdge *edges = malloc(m * sizeof(WeightedBipartiteEdge));
+#include <sys/time.h>
+#include <time.h>
 
-  for (i = 0; i < m; i++) {
-    edges[i].left = rand() % n;
-    edges[i].right = rand() % n;
-    edges[i].cost = (rand() % 100) + 1;
+int main() {
+
+
+  struct timeval tv1;
+  struct timezone tzp1;  
+  gettimeofday(&tv1, &tzp1);
+  uint32_t random_seed = ((tv1.tv_sec & 0177) * 1000000) + tv1.tv_usec;
+
+  fprintf(stderr, "random seed = %d\n", random_seed);
+  srand(random_seed);
+  
+  uint32_t n = 10000;
+  uint32_t m = 15;
+  uint32_t i, j;
+  
+  WeightedBipartiteEdge *edges = malloc(n * m * sizeof(WeightedBipartiteEdge));
+
+  uint32_t e = 0;
+  for (i = 0; i < n; i++) {
+    for(j = 0; j < m; j++) {
+      edges[e].left = i;
+      edges[e].right = rand() % n;
+      edges[e].cost = j+1;
+      e++;
+    }
   }
   
-  uint32_t *matching = hungarianMinimumWeightPerfectMatching(n, edges, m);
+  uint32_t *matching = hungarianMinimumWeightPerfectMatching(n, edges, n*m);
 
   free(edges);
   
@@ -22,6 +38,9 @@ int main() {
     fprintf(stdout, "Failure: Hungarian algorithm didn't find a matching.\n");
   } else {
     fprintf(stdout, "Matching was found.\n");
+    for(i = 0; i < n; i++) {
+      fprintf(stdout, "%u -> %u\n", i, matching[i]);
+    }
   }
 
   free(matching);
