@@ -14,7 +14,7 @@ int main() {
   fprintf(stderr, "random seed = %d\n", random_seed);
   srand(random_seed);
   
-  uint32_t n = 10000;
+  uint32_t n = 100000;
   uint32_t m = 15;
   uint32_t i, j;
   
@@ -32,8 +32,6 @@ int main() {
   
   uint32_t *matching = hungarianMinimumWeightPerfectMatching(n, edges, n*m);
 
-  free(edges);
-  
   if (matching == NULL) {
     fprintf(stdout, "Failure: Hungarian algorithm didn't find a matching.\n");
   } else {
@@ -41,8 +39,17 @@ int main() {
     for(i = 0; i < n; i++) {
       fprintf(stdout, "%u -> %u\n", i, matching[i]);
     }
+
+    uint32_t weight = 0;
+    for(i = 0; i < n*m; i++) {
+      if(matching[edges[i].left] == edges[i].right) {
+        weight += edges[i].cost;
+      }
+    }
+    fprintf(stdout, "Minimum Weight is: %u\n", weight);
   }
 
+  free(edges);
   free(matching);
   
   return 0;

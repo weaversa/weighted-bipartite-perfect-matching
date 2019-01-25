@@ -47,7 +47,7 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
   uint32_t edgeIndex;
   for(edgeIndex = 0; edgeIndex < numEdges; edgeIndex++) {
     WeightedBipartiteEdge edge = allEdges[edgeIndex];
-    if (edge.left >= 0 && edge.left < n) {
+    if(edge.left < n) {
       leftEdgeCounts[edge.left]++;
     } else {
       free(leftEdgeCounts);
@@ -55,7 +55,7 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
       return NULL;
     }
     
-    if (edge.right >= 0 && edge.right < n) {
+    if(edge.right < n) {
       rightEdgeCounts[edge.right]++;
     } else {
       free(leftEdgeCounts);
@@ -87,7 +87,7 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
   // Actually add to the edge lists now.
   for(edgeIndex = 0; edgeIndex < numEdges; edgeIndex++) {
     WeightedBipartiteEdge edge = allEdges[edgeIndex];
-    if (edge.left >= 0 && edge.left < n && edge.right >= 0 && edge.right < n) {
+    if (edge.left < n && edge.right < n) {
       leftEdges[edge.left][leftEdgeCounts[edge.left]++] = (struct LeftEdge) {edge.right, edge.cost};
     }
   }
