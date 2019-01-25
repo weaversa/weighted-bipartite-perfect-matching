@@ -12,6 +12,8 @@
 //
 // (Note: end value is cached, so fo(i, function()) will only have function called once.)
 
+create_c_queue_type(uint32_t_queue, uint32_t)
+
 static const int32_t oo = 0x7fffffff;
 static const uint32_t UNMATCHED = 0xffffffff;
 
@@ -562,4 +564,3 @@ uint32_t *hungarianMinimumWeightPerfectMatching(uint32_t n, WeightedBipartiteEdg
   return leftMatchedTo;
 }
 
-create_c_queue_type(uint32_t_queue, uint32_t)
