@@ -48,7 +48,7 @@ test/test: test/test.c lib/lib$(HUNGARIANLIB).a
 	$(CC) $(CFLAGS) $(LDFLAGS) test/test.c -o test/test $(LIBS)
 
 clean: FORCE
-	rm -rf *~ */*~ $(OBJECTS) ./.depend test/test *.dSYM test/test.dSYM
+	rm -rf *~ */*~ $(OBJECTS) ./.depend test/test *.dSYM test/test.dSYM lib/lib$(HUNGARIANLIB).a
 
 edit: FORCE
 	emacs -nw $(EXTRAS) $(HEADERS) $(SOURCES)
