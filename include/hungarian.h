@@ -7,7 +7,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include "c_queue_types.h"
+#include "../lib/c_list_types/include/c_queue_types.h"
 
 create_c_queue_headers(uint32_t_queue, uint32_t)
 

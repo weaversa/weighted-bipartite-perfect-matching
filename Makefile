@@ -10,7 +10,7 @@ HUNGARIANLIB = hungarian
 CC = gcc
 DBG = #-g -Wconversion -Wall -fstack-protector-all -pedantic
 OPT = -march=native -O3 -DNDEBUG -ffast-math -fomit-frame-pointer -finline-functions
-INCLUDES = -Iinclude -Ilib/c_list_types/include
+INCLUDES = -Iinclude
 LIBS = -l$(HUNGARIANLIB)
 LDFLAGS = -Llib
 CFLAGS = -std=gnu99 $(DBG) $(OPT) $(INCLUDES)
